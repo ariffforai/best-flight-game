@@ -4,7 +4,7 @@
 
 import { PLANE, RING, RUN, STEP } from './config.js';
 import { hash01 } from './random.js';
-import { buildTreeStand, terrainHeightAt } from './terrain.js';
+import { buildTreeStand, isRunwayGround, terrainHeightAt } from './terrain.js';
 
 export const EVENT_NONE = 0;
 export const EVENT_RING = 1;
@@ -12,7 +12,8 @@ export const EVENT_NEAR_MISS = 2;
 export const EVENT_CRASH = 4;
 export const EVENT_OUT_OF_FUEL = 8;
 export const EVENT_OUT_OF_TIME = 16;
-export const EVENT_OVER = EVENT_CRASH | EVENT_OUT_OF_FUEL | EVENT_OUT_OF_TIME;
+export const EVENT_LANDED = 32;
+export const EVENT_OVER = EVENT_CRASH | EVENT_OUT_OF_FUEL | EVENT_OUT_OF_TIME | EVENT_LANDED;
 
 export const PHASE_TITLE = 'title';
 export const PHASE_FLYING = 'flying';
@@ -54,6 +55,7 @@ export function createWorld(seed) {
     messageTime: 0,
     nextRingIndex: 0,
     elapsed: 0,
+    flewAway: false, // true once the plane has left the airfield behind
   };
 }
 
@@ -113,6 +115,7 @@ export function stepWorld(world, input, dt = STEP) {
   const sink = plane.throttle < 0.12 ? 4 : 0;
   plane.y += plane.speed * Math.sin(plane.pitch) * PLANE.climbRate * dt - sink * dt;
   plane.y = clamp(plane.y, 1, PLANE.ceiling);
+  if (plane.z > RUN.airfieldClearZ) world.flewAway = true;
 
   // Fuel burns with throttle (faster on boost) and the clock always runs.
   world.fuel -= (RUN.fuelBurn * plane.throttle + (boosting ? RUN.boostFuelBurn : 0)) * dt;
@@ -144,9 +147,25 @@ export function stepWorld(world, input, dt = STEP) {
     world.nextRingIndex += 1;
   }
 
-  // The run ends on terrain, on empty fuel, or on an empty clock.
+  // The run ends on terrain, on empty fuel, or on an empty clock — unless
+  // the plane touches down gently on the runway after leaving the airfield,
+  // which lands the run instead and pays the landing bonus.
   const ground = terrainHeightAt(plane.x, plane.z);
   if (plane.y <= ground + 1.5) {
+    const sinkSpeed = plane.speed * Math.sin(plane.pitch) * PLANE.climbRate - sink;
+    const gentleTouchdown =
+      isRunwayGround(plane.x, plane.z) &&
+      world.flewAway &&
+      plane.speed <= RUN.maxLandingSpeed &&
+      sinkSpeed >= -RUN.maxLandingSink;
+    if (gentleTouchdown) {
+      world.phase = PHASE_OVER;
+      world.crashReason = 'LANDED';
+      world.score += RUN.landingBonus;
+      world.message = `LANDED! +${RUN.landingBonus}`;
+      world.messageTime = 2.5;
+      return events | EVENT_LANDED;
+    }
     world.phase = PHASE_OVER;
     world.crashReason = 'TERRAIN STRIKE';
     world.message = '';

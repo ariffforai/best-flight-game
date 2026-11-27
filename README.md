@@ -20,7 +20,7 @@ node serve.ts   # serves game/ at http://localhost:8080
 - **Click** — switch between chase view and cockpit view
 - **Enter** — start, or fly again after a crash
 
-Each ring you thread scores **+100** (golden rings +150) and adds **8 seconds** to the clock. A near miss still pays +25. Fuel burns with the throttle and the clock always runs — a run ends on a terrain strike, an empty tank, or an empty clock.
+Each ring you thread scores **+100** (golden rings +150) and adds **8 seconds** to the clock. A near miss still pays +25. Fuel burns with the throttle and the clock always runs — a run ends on a terrain strike, an empty tank, or an empty clock. Or land it: touch down gently on the runway strip after leaving the airfield and the run ends with a **LANDED! +500** bonus. Fuel under 20% flashes a LOW FUEL warning on the HUD with an audio cue — bring her home before the tank runs dry.
 
 ## The game
 
@@ -31,10 +31,10 @@ Each ring you thread scores **+100** (golden rings +150) and adds **8 seconds** 
 - `game/src/render.js` — sky, projected terrain, rings, the aircraft, the cockpit, the HUD
 - `game/src/input.js` — keyboard and mouse into stick, throttle and boost
 - `game/src/audio.js` — WebAudio beeps, synthesized, no sound files
-- `game/src/shots.js` — the deterministic autopilot behind `?shot=cover|low|valley|end`
+- `game/src/shots.js` — the deterministic autopilot behind `?shot=cover|low|valley|end|landed`
 - `game/src/main.js` — the game loop and the title / flying / game-over phases
 
-The screenshots in `screenshots/` are real renders of this code in a headless browser: the cover is peak gameplay (chase view, a glowing ring dead ahead, HUD lit), then the cockpit over the runway, a ring fly-through high over the valley, and the game-over screen.
+The screenshots in `screenshots/` are real renders of this code in a headless browser: the cover is peak gameplay (chase view, a glowing ring dead ahead, HUD lit), then the cockpit over the runway, a ring fly-through high over the valley, and the LANDED screen — a runway landing after the rings, +500 on the score.
 
 ## Entry
 

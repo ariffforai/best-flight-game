@@ -25,6 +25,11 @@ export const RUN = {
   ringTimeBonus: 8, // seconds added for each ring flown through
   ringScore: 100,
   nearMissScore: 25,
+  landingBonus: 500, // scored for landing back on the runway strip
+  maxLandingSpeed: 60, // above this, touching the runway is a crash, not a landing
+  maxLandingSink: 10, // descending faster than this (units/s) is a crash, not a landing
+  airfieldClearZ: 700, // must have flown past this z before a landing counts
+  lowFuelThreshold: 20, // fuel percent below which the low-fuel warning fires
   fuelBurn: 0.55, // fuel percent per second at full throttle
   boostFuelBurn: 2.2, // extra fuel percent per second while boosting
   boostMultiplier: 1.5,

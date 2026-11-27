@@ -52,3 +52,16 @@ export function playCrashThud(sound) {
   playTone(sound, 110, 0.4, 'sawtooth', 0.16);
   setTimeout(() => playTone(sound, 70, 0.5, 'sawtooth', 0.14), 120);
 }
+
+/** Two descending beeps while the fuel gauge is in the red. */
+export function playLowFuelWarning(sound) {
+  playTone(sound, 880, 0.1, 'square', 0.07);
+  setTimeout(() => playTone(sound, 620, 0.14, 'square', 0.07), 130);
+}
+
+/** A rising three-note chime for a runway landing. */
+export function playLandingFanfare(sound) {
+  playTone(sound, 523, 0.16, 'sine', 0.12);
+  setTimeout(() => playTone(sound, 659, 0.16, 'sine', 0.12), 140);
+  setTimeout(() => playTone(sound, 784, 0.3, 'sine', 0.12), 280);
+}

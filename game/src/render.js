@@ -2,7 +2,7 @@
 // trees, glowing rings, the aircraft, the cockpit, the HUD and the screens.
 // One clear job: turn a world state and a camera into one canvas frame.
 
-import { COLORS, RING, WORLD } from './config.js';
+import { COLORS, RING, RUN, WORLD } from './config.js';
 import { isRiverWater, isRunwayGround, riverCentreX, terrainHeightAt } from './terrain.js';
 import { nextRing, PHASE_FLYING, PHASE_OVER, PHASE_TITLE, visibleRings } from './world.js';
 
@@ -100,14 +100,26 @@ function drawSky(ctx, width, height, camera) {
   ctx.beginPath();
   ctx.arc(sunX, sunY, 44, 0, Math.PI * 2);
   ctx.fill();
-  // A few flat clouds drifting over the valley.
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-  for (let index = 0; index < 6; index += 1) {
+  // Layered clouds drifting over the valley: a high band of big puffs and a
+  // lower band of smaller, hazier ones near the horizon for depth.
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
+  for (let index = 0; index < 13; index += 1) {
     const cx = ((index * 331 + 140) % 1200) / 1200 * width;
-    const cy = height * (0.08 + (index % 3) * 0.07);
+    const cy = height * (0.05 + (index % 4) * 0.055);
+    const size = 46 + (index % 5) * 12;
     ctx.beginPath();
-    ctx.ellipse(cx, cy, 70, 14, 0, 0, Math.PI * 2);
-    ctx.ellipse(cx + 44, cy + 5, 46, 11, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy, size, size * 0.2, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx + size * 0.62, cy + size * 0.07, size * 0.62, size * 0.16, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx - size * 0.55, cy + size * 0.06, size * 0.5, size * 0.14, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+  for (let index = 0; index < 8; index += 1) {
+    const cx = ((index * 521 + 260) % 1200) / 1200 * width;
+    const cy = height * (0.26 + (index % 3) * 0.04);
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, 52, 9, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx + 34, cy + 3, 34, 7, 0, 0, Math.PI * 2);
     ctx.fill();
   }
   // Base fill below the horizon so no gap ever shows between sky and terrain.
@@ -424,7 +436,11 @@ function drawHud(ctx, world, width, height, view) {
   // Bottom-left: fuel and time bars.
   const barY = height - (view === 'cockpit' ? height * 0.24 + 58 : 58);
   hudPanel(ctx, pad, barY - 8, 250, 52);
-  ctx.fillStyle = COLORS.hudAmber;
+  // Low-fuel alarm: the FUEL label flashes and a big warning blinks on
+  // while the tank is under the threshold (flying only, not game over).
+  const fuelAlarm = world.phase === PHASE_FLYING && world.fuel < RUN.lowFuelThreshold;
+  const alarmOn = fuelAlarm && Math.floor(world.elapsed * 3) % 2 === 0;
+  ctx.fillStyle = alarmOn ? COLORS.hudRed : COLORS.hudAmber;
   ctx.font = 'bold 12px sans-serif';
   ctx.textAlign = 'left';
   ctx.fillText(`FUEL ${Math.round(world.fuel)}%`, pad + 12, barY + 8);
@@ -452,21 +468,43 @@ function drawHud(ctx, world, width, height, view) {
   ctx.font = 'bold 11px sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText('THR', width - 24, throttleTop - 8);
-  // Next-ring distance, under the compass.
+  // Next-ring distance, under the compass — on a dark pill so it stays
+  // readable against the sky and the clouds drifting behind it.
   const ring = nextRing(world);
   const ringDistance = Math.max(0, Math.round(ring.z - plane.z));
-  ctx.fillStyle = COLORS.hudAmber;
+  const ringText = `NEXT RING ${ring.index + 1} — ${ringDistance}m`;
   ctx.font = 'bold 15px sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText(`NEXT RING ${ring.index + 1} — ${ringDistance}m`, width / 2, pad + 66);
-  // Flash message for rings and near misses.
-  if (world.messageTime > 0 && world.message) {
+  const ringTextWidth = ctx.measureText(ringText).width;
+  ctx.fillStyle = COLORS.hudPanel;
+  ctx.beginPath();
+  ctx.roundRect(width / 2 - ringTextWidth / 2 - 12, pad + 44, ringTextWidth + 24, 24, 8);
+  ctx.fill();
+  ctx.fillStyle = COLORS.hudAmber;
+  ctx.fillText(ringText, width / 2, pad + 61);
+  // Flash message for rings and near misses (flying only — the end screen
+  // speaks for itself once the run is over). Dark outline so it reads
+  // against bright cloud as well as blue sky.
+  if (world.phase === PHASE_FLYING && world.messageTime > 0 && world.message) {
     ctx.globalAlpha = Math.min(1, world.messageTime);
-    ctx.fillStyle = COLORS.hudAmber;
     ctx.font = 'bold 34px sans-serif';
     ctx.textAlign = 'center';
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = 'rgba(6, 14, 24, 0.75)';
+    ctx.strokeText(world.message, width / 2, height * 0.17);
+    ctx.fillStyle = COLORS.hudAmber;
     ctx.fillText(world.message, width / 2, height * 0.17);
     ctx.globalAlpha = 1;
+  }
+  // Low-fuel warning: big flashing text under the ring message.
+  if (alarmOn) {
+    ctx.font = 'bold 30px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = 'rgba(6, 14, 24, 0.75)';
+    ctx.strokeText('LOW FUEL — LAND ON THE RUNWAY!', width / 2, height * 0.24);
+    ctx.fillStyle = COLORS.hudRed;
+    ctx.fillText('LOW FUEL — LAND ON THE RUNWAY!', width / 2, height * 0.24);
   }
 }
 
@@ -482,7 +520,7 @@ function drawTitleScreen(ctx, world, width, height) {
   ctx.fillText('Fly the valley. Thread every glowing ring. Mind the mountains.', width / 2, height * 0.38);
   ctx.font = '18px sans-serif';
   ctx.fillText('ARROWS / WASD — pitch & roll      W / S — throttle      SPACE — boost', width / 2, height * 0.5);
-  ctx.fillText('Each ring scores +100 and adds 8 seconds. Fuel and the clock are always running.', width / 2, height * 0.55);
+  ctx.fillText('Each ring scores +100 and adds 8 seconds. Fuel and the clock always run — land on the runway for +500.', width / 2, height * 0.55);
   ctx.fillStyle = COLORS.hudGreen;
   ctx.font = 'bold 22px sans-serif';
   ctx.fillText('CLICK OR PRESS ENTER TO FLY', width / 2, height * 0.66);
@@ -494,15 +532,16 @@ function drawTitleScreen(ctx, world, width, height) {
 }
 
 function drawGameOverScreen(ctx, world, width, height) {
+  const landed = world.crashReason === 'LANDED';
   ctx.fillStyle = 'rgba(6, 10, 18, 0.62)';
   ctx.fillRect(0, 0, width, height);
   ctx.textAlign = 'center';
-  ctx.fillStyle = COLORS.hudRed;
+  ctx.fillStyle = landed ? COLORS.hudGreen : COLORS.hudRed;
   ctx.font = `bold ${Math.round(width * 0.05)}px sans-serif`;
-  ctx.fillText('FLIGHT OVER', width / 2, height * 0.3);
+  ctx.fillText(landed ? 'LANDED!' : 'FLIGHT OVER', width / 2, height * 0.3);
   ctx.fillStyle = COLORS.hudAmber;
   ctx.font = 'bold 26px sans-serif';
-  ctx.fillText(world.crashReason, width / 2, height * 0.38);
+  ctx.fillText(landed ? `RUNWAY LANDING  +${RUN.landingBonus}` : world.crashReason, width / 2, height * 0.38);
   ctx.fillStyle = COLORS.hudText;
   ctx.font = 'bold 30px sans-serif';
   ctx.fillText(`SCORE ${world.score}`, width / 2, height * 0.48);

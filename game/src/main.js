@@ -2,14 +2,15 @@
 // title, flying and game-over phases, and freezes a deterministic screenshot
 // scene when the page is opened with ?shot=cover|low|valley|end&seed=1.
 
-import { GAME_TITLE, STEP } from './config.js';
+import { GAME_TITLE, RUN, STEP } from './config.js';
 import { attachInput, consumeStartPress, createInput, readFlightInput } from './input.js';
 import { renderGame } from './render.js';
 import { stageShot } from './shots.js';
-import { createSound, playCrashThud, playNearMissTick, playRingChime, unlockSound } from './audio.js';
+import { createSound, playCrashThud, playLandingFanfare, playLowFuelWarning, playNearMissTick, playRingChime, unlockSound } from './audio.js';
 import {
   createWorld,
   EVENT_CRASH,
+  EVENT_LANDED,
   EVENT_NEAR_MISS,
   EVENT_OUT_OF_FUEL,
   EVENT_OUT_OF_TIME,
@@ -36,6 +37,7 @@ attachInput(input, canvas);
 let view = 'chase';
 let lastTime = performance.now();
 let accumulator = 0;
+let lastFuelBeepAt = -10; // run time of the last low-fuel beep, in seconds
 
 function resizeCanvas() {
   canvas.width = window.innerWidth;
@@ -53,6 +55,10 @@ function announceStatus() {
 function handleEvents(events) {
   if (events & EVENT_RING) playRingChime(sound);
   if (events & EVENT_NEAR_MISS) playNearMissTick(sound);
+  if (events & EVENT_LANDED) {
+    playLandingFanfare(sound);
+    world.best = Math.max(world.best, world.score);
+  }
   if (events & (EVENT_CRASH | EVENT_OUT_OF_FUEL | EVENT_OUT_OF_TIME)) {
     playCrashThud(sound);
     world.best = Math.max(world.best, world.score);
@@ -77,6 +83,11 @@ function gameFrame(now) {
     while (accumulator >= STEP) {
       handleEvents(stepWorld(world, readFlightInput(input), STEP));
       accumulator -= STEP;
+    }
+    // Low-fuel alarm: a beep every few seconds while the tank is in the red.
+    if (world.fuel < RUN.lowFuelThreshold && world.elapsed - lastFuelBeepAt >= 2.5) {
+      playLowFuelWarning(sound);
+      lastFuelBeepAt = world.elapsed;
     }
   } else {
     accumulator = 0;
